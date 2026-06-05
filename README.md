@@ -87,9 +87,9 @@
 
 | Параметр | Тип | Описание |
 |----------|-----|----------|
-| `element_id_451` | int/str | ID элемента в Списке 451 BX24 (приоритетный) |
-| `element_name_451` | str | NAME элемента в Списке 451 BX24 |
-| `element_buttons_451` | bool | Использовать кнопки из Списка 451 (default: false) |
+| `element_id_451` | int/str | ID элемента в Списке |
+| `element_name_451` | str | NAME элемента в Списке |
+| `element_buttons_451` | bool | Использовать кнопки из Списка (default: false) |
 | `expat` | bool | `true` — экспаты, `false` — пользователи РФ |
 
 **Пример:**
@@ -103,7 +103,7 @@ GET /api/mass-mailing-telegram?element_id_451=42&expat=false&element_buttons_451
 
 | Таблица | Назначение |
 |---------|------------|
-| `GPS_leads` | Лиды CRM Битрикс24 |
+| `leads` | Лиды CRM Битрикс24 |
 | `lms_users` | Пользователи LMS (статус обучения, баланс, часовой пояс) |
 | `max_users` | Пользователи MAX мессенджера (chat_id ↔ lead_id) |
 | `tg_customer_links` | Привязка Telegram chat_id к пользователям LMS |
