@@ -1,0 +1,145 @@
+networks:
+  default:
+    driver: bridge
+
+services:
+  nginx-mailman:
+    container_name: mailman-nginx
+    image: umputun/nginx-le:v1.4.3
+    ports:
+      - "80:80"
+      - "443:443"
+    expose:
+      - "80"
+      - "443"
+    volumes:
+      - ./nginx/${NGINX_CONF_FILENAME}.conf:/etc/nginx/service.conf
+      - ./nginx/ssl:/etc/nginx/ssl
+      - ./nginx/logs:/var/log/nginx
+      - ./nginx/data:/srv
+    environment:
+      - TZ=GMT
+      - LE_EMAIL=olga.lebedeva@hwschool.online
+      - LE_FQDN=mailman.hwschool.pro
+      - LETSENCRYPT=true
+    networks:
+      - default
+    restart: always
+
+  mailman:
+    container_name: mailman
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+    env_file:
+      - .env
+    environment:
+      - TZ=Europe/Moscow
+      - PYTHONUNBUFFERED=1
+    healthcheck:
+      test: [ "CMD", "pgrep", "-f", "python.*main.py" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - default
+    volumes:
+      - redis_data:/data
+
+  scheduler:
+    container_name: mailman_scheduler
+    build: .
+    command: python -m src.db.job
+    volumes:
+      - ./src:/app/src
+      - ./data:/app/data
+    env_file:
+      - .env
+    environment:
+      - TZ=Europe/Moscow
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      - redis
+      - mailman
+    restart: always
+    networks:
+      - default
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  celery_worker:
+    container_name: mailman_celery
+    build: ./celery_app
+    env_file:
+      - .env
+    volumes:
+      - ./app_celery:/app/app_celery
+      - ./src:/app/src
+      - ./src:/home/project
+      - .:/app
+      - ./app_celery:/app/app_celery
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: always
+    networks:
+      - default
+
+  flower:
+    image: mher/flower:latest
+    container_name: mailman_flower
+    command:
+      - celery
+      - flower
+      - --broker=${CELERY_BROKER_URL}
+      - --port=${FLOWER_PORT}
+      - --address=${APP_HOST}
+      - --basic_auth=${FLOWER_AUTH}
+      - --persistent=True
+      - --db=/data/flower.db
+    environment:
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL}
+    ports:
+      - "${FLOWER_PORT}:${FLOWER_PORT}"
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -f http://localhost:5555/ || exit 1" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: always
+    volumes:
+      - flower_data:/data
+    networks:
+      - default
+
+volumes:
+  logs-data:
+  redis_data:
+  flower_data:
+  full-logs-data:
